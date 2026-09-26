@@ -1,0 +1,16 @@
+# Normalise line endings so the repository is not full of CRLF/LF noise
+# when it is cloned on Windows, macOS and Linux.
+* text=auto eol=lf
+
+# Binary files must never be converted.
+*.mp4 binary
+*.webm binary
+*.avi binary
+*.jpg binary
+*.png binary
+*.pt binary
+*.db binary
+
+# Keep generated and archived code out of GitHub's language statistics, so the
+# repository is reported as the Python project it is.
+legacy/** linguist-vendored

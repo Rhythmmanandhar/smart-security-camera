@@ -1,0 +1,8 @@
+# Runtime dependencies
+opencv-python>=4.8,<5
+numpy>=1.24,<3
+Flask>=3.0,<4
+
+# Optional: object classification (--classifier yolo).
+# Pulls in PyTorch (~300 MB); everything else works without it.
+# ultralytics>=8.0

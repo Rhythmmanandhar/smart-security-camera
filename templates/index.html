@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Smart Security Camera</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body>
+  <!-- Icon sprite: one definition per glyph, referenced with <use> ---------- -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6z" />
+        <circle cx="12" cy="11" r="2.4" />
+      </symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 16V4M7 9l5-5 5 5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+      </symbol>
+      <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 8a2 2 0 012-2h3l1.6-2h4.8L19 6h0a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+        <circle cx="12" cy="12.5" r="3.4" />
+      </symbol>
+      <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5l11 7-11 7z" /></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 13A8.4 8.4 0 0111 3a8.4 8.4 0 1010 10z" />
+      </symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+      </symbol>
+      <symbol id="i-empty" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 15l4-4 4 4 3-3 7 6" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- App bar -------------------------------------------------------------- -->
+  <header class="app-bar">
+    <div class="brand">
+      <span class="brand-mark"><svg><use href="#i-shield" /></svg></span>
+      <span>
+        Smart Security Camera
+        <small>motion · tracking · incident recording</small>
+      </span>
+    </div>
+
+    <div class="bar-spacer"></div>
+
+    <div id="statePill" class="state-pill" data-state="idle" role="status" aria-live="polite">
+      <span class="dot"></span>
+      <span id="stateText" class="label">Idle</span>
+    </div>
+
+    <button id="themeToggle" class="icon-btn" type="button" title="Switch theme" aria-label="Switch between dark and light theme">
+      <svg class="theme-icon-dark"><use href="#i-sun" /></svg>
+      <svg class="theme-icon-light"><use href="#i-moon" /></svg>
+    </button>
+  </header>
+
+  <main class="workspace">
+    <!-- Console ------------------------------------------------------------ -->
+    <section class="panel">
+      <div class="tab-nav" role="tablist">
+        <button class="tab-btn active" role="tab" aria-selected="true" data-tab="upload">Analyse</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="live">Live</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="incidents">
+          Incidents<span id="incidentCount" class="count" hidden>0</span>
+        </button>
+      </div>
+
+      <!-- Analyse a recording -->
+      <div id="upload-tab" class="tab-content active" role="tabpanel">
+        <form id="videoForm">
+          <div id="dropZone" class="drop-zone" tabindex="0" role="button"
+               aria-label="Choose a video file or drop one here">
+            <input id="videoFile" name="video_file" type="file" accept="video/*" hidden />
+            <span class="drop-icon"><svg><use href="#i-upload" /></svg></span>
+            <p><strong>Drop a video</strong> or click to browse</p>
+            <span id="fileName">No file selected</span>
+          </div>
+
+          <div class="divider">OR</div>
+
+          <label class="field">
+            <span>Video URL</span>
+            <input type="url" name="video_url" placeholder="https://example.com/video.mp4" autocomplete="off" />
+          </label>
+
+          <div class="settings-grid">
+            <label class="field">
+              <span>Sensitivity</span>
+              <select name="sensitivity">
+                <option value="low">Low</option>
+                <option value="balanced" selected>Balanced (default)</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Detection</span>
+              <select name="detection" id="classifierSelect">
+                <option value="motion" selected>Motion only (fast)</option>
+                <option value="yolo-objects">Objects — one labelled box each</option>
+                <option value="yolo">Motion, confirmed by YOLO</option>
+                <option value="hog">Motion, confirmed by HOG</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="field" id="classesField" hidden>
+            <span>Alarm on</span>
+            <input type="text" name="classes" id="classesInput"
+                   value="person,bicycle,car,motorcycle,bus,truck,cat,dog" />
+          </label>
+
+          <!-- Zones -->
+          <div class="zone-block">
+            <div class="zone-head">
+              <span class="zone-head-title">Zones</span>
+              <span id="zonePreviewStatus" class="hint">Choose a video to draw on a frame</span>
+            </div>
+
+            <div id="zoneEditor" class="zone-editor" hidden>
+              <div class="zone-toolbar" role="group" aria-label="Zone tools">
+                <button type="button" class="chip active" data-zone-mode="roi">
+                  <span class="swatch swatch-roi"></span> Monitored
+                </button>
+                <button type="button" class="chip" data-zone-mode="ignore">
+                  <span class="swatch swatch-ignore"></span> Ignore
+                </button>
+                <button type="button" class="chip ghost" data-zone-action="undo">Undo</button>
+                <button type="button" class="chip ghost" data-zone-action="clear">Clear</button>
+              </div>
+              <div class="zone-stage">
+                <img id="zoneImage" alt="Video frame used for drawing zones" />
+                <canvas id="zoneCanvas"></canvas>
+              </div>
+              <span class="hint">
+                Drag to draw. The monitored zone limits where alarms can happen;
+                ignore zones silence a region. Click a zone to remove it.
+              </span>
+            </div>
+          </div>
+
+          <details class="fold">
+            <summary>Advanced timing and coordinates</summary>
+            <div class="fold-body">
+              <div class="settings-grid">
+                <label class="field">
+                  <span>Pre-event (s)</span>
+                  <input type="number" name="pre_event_seconds" placeholder="2.0" min="0" max="30" step="0.5" />
+                </label>
+                <label class="field">
+                  <span>Post-event (s)</span>
+                  <input type="number" name="post_event_seconds" placeholder="2.5" min="0" max="60" step="0.5" />
+                </label>
+                <label class="field">
+                  <span>Motion needed (s)</span>
+                  <input type="number" name="min_motion_seconds" placeholder="0.6" min="0" max="30" step="0.1" />
+                </label>
+              </div>
+              <label class="field" style="margin-top:12px">
+                <span>Monitored zone</span>
+                <input type="text" name="roi" id="roiInput" placeholder="0.2 0.2 0.9 0.9" />
+              </label>
+              <label class="field">
+                <span>Ignore zones (one per line)</span>
+                <textarea name="ignore_zones" id="ignoreInput" rows="2" placeholder="0.7 0 1 0.1"></textarea>
+              </label>
+            </div>
+          </details>
+
+          <label class="checkbox-row">
+            <input type="checkbox" name="tracking" checked />
+            <span>Show object IDs and paths on the clip</span>
+          </label>
+
+          <div class="form-actions">
+            <button id="submitBtn" class="btn btn-primary" type="submit">
+              <svg><use href="#i-play" /></svg> Run analysis
+            </button>
+            <button id="cancelBtn" class="btn btn-ghost" type="button" hidden>Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Live camera -->
+      <div id="live-tab" class="tab-content" role="tabpanel">
+        <div class="settings-grid">
+          <label class="field">
+            <span>Camera</span>
+            <select id="liveDevice"><option value="0">Detecting…</option></select>
+          </label>
+          <label class="field">
+            <span>Sensitivity</span>
+            <select id="liveSensitivity">
+              <option value="low">Low</option>
+              <option value="balanced" selected>Balanced</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Detection</span>
+            <select id="liveClassifier">
+              <option value="motion" selected>Motion only (fast)</option>
+              <option value="yolo-objects">Objects — one labelled box each</option>
+              <option value="yolo">Motion, confirmed by YOLO</option>
+              <option value="hog">Motion, confirmed by HOG</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" id="liveTracking" checked />
+          <span>Show object IDs</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="liveRecording" checked />
+          <span>Record incidents to disk</span>
+        </label>
+
+        <div class="form-actions" style="flex-wrap:wrap">
+          <button id="startLiveBtn" class="btn btn-primary" type="button">
+            <svg><use href="#i-camera" /></svg> Start camera
+          </button>
+          <button id="stopLiveBtn" class="btn btn-danger" type="button" disabled>Stop</button>
+        </div>
+        <div class="form-actions" style="flex-wrap:wrap">
+          <button id="liveZonesBtn" class="btn btn-ghost btn-sm" type="button">Draw zones</button>
+          <button id="rescanBtn" class="btn btn-ghost btn-sm" type="button">Rescan cameras</button>
+          <a id="snapshotBtn" class="btn btn-ghost btn-sm" href="/api/live/snapshot" download hidden>Snapshot</a>
+        </div>
+
+        <div id="liveZoneEditor" class="zone-editor" hidden style="padding-left:0;padding-right:0">
+          <div class="zone-toolbar" role="group" aria-label="Zone tools">
+            <button type="button" class="chip active" data-zone-mode="roi">
+              <span class="swatch swatch-roi"></span> Monitored
+            </button>
+            <button type="button" class="chip" data-zone-mode="ignore">
+              <span class="swatch swatch-ignore"></span> Ignore
+            </button>
+            <button type="button" class="chip ghost" data-zone-action="undo">Undo</button>
+            <button type="button" class="chip ghost" data-zone-action="clear">Clear</button>
+            <button type="button" class="chip ghost" id="liveZonesDone">Done</button>
+          </div>
+          <div class="zone-stage">
+            <img id="liveZoneImage" alt="Camera frame used for drawing zones" />
+            <canvas id="liveZoneCanvas"></canvas>
+          </div>
+          <span class="hint" id="liveZoneHint">
+            Drag to draw. Zones apply the next time the camera starts.
+          </span>
+        </div>
+      </div>
+
+      <!-- Incidents -->
+      <div id="incidents-tab" class="tab-content" role="tabpanel">
+        <div class="toolbar">
+          <select id="incidentFilter" aria-label="Filter incidents by source">
+            <option value="">All sources</option>
+            <option value="upload">Uploaded videos</option>
+            <option value="live">Live camera</option>
+            <option value="archive">Earlier runs</option>
+          </select>
+          <button id="refreshIncidentsBtn" class="btn btn-ghost btn-sm" type="button">Refresh</button>
+          <span class="spacer"></span>
+          <span id="incidentsStatus" class="count-note">Loading…</span>
+        </div>
+        <div id="incidentsGrid" class="incidents-grid"></div>
+      </div>
+    </section>
+
+    <!-- Monitor ------------------------------------------------------------ -->
+    <section class="panel monitor">
+      <div class="panel-head">
+        <h2 id="monitorTitle">Monitor</h2>
+        <span id="monitorSub" class="sub">Nothing running</span>
+      </div>
+
+      <div class="panel-body">
+        <div id="statusStrip" class="status-strip" data-state="idle">
+          <span class="beacon"></span>
+          <span id="statusMessage" class="status-text" role="status" aria-live="polite">
+            Choose a recording or start the live camera.
+          </span>
+        </div>
+
+        <div id="progressWrap" class="progress-wrap" hidden>
+          <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+          <span id="progressLabel" class="progress-label">0%</span>
+        </div>
+
+        <div id="stageWrap" class="stage" hidden>
+          <img id="liveStream" class="live-stream" src="" alt="Live camera preview" />
+          <div id="stageBadge" class="stage-badge" hidden><span class="rec"></span><span id="stageBadgeText">LIVE</span></div>
+        </div>
+
+        <dl id="liveInfo" class="stat-grid" hidden>
+          <div class="stat"><dt>Resolution</dt><dd id="statResolution">—</dd></div>
+          <div class="stat"><dt>Frame rate</dt><dd id="statFps">—</dd></div>
+          <div class="stat"><dt>Frames</dt><dd id="statFrames">—</dd></div>
+          <div class="stat" id="statIncidentsTile"><dt>Incidents</dt><dd id="statIncidents">—</dd></div>
+          <div class="stat"><dt>Tracked</dt><dd id="statTracked">—</dd></div>
+          <div class="stat"><dt>Uptime</dt><dd id="statUptime">—</dd></div>
+        </dl>
+
+        <div id="timeline" class="timeline" hidden>
+          <div class="timeline-head">
+            <span>Incident timeline</span>
+            <span id="timelineLabel" class="num"></span>
+          </div>
+          <div id="timelineTrack" class="timeline-track"></div>
+          <div class="timeline-scale"><span>0s</span><span id="timelineEnd">—</span></div>
+        </div>
+
+        <div id="resultsList" class="results-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    Clips, thumbnails and metadata are written to <code>outputs/web_jobs/</code>
+    · press <span class="kbd">Esc</span> to close the player
+  </footer>
+
+  <div id="toastHost" class="toast-host" aria-live="polite"></div>
+
+  <!-- Clip player ---------------------------------------------------------- -->
+  <div id="lightbox" class="lightbox" hidden role="dialog" aria-modal="true" aria-labelledby="lightboxTitle">
+    <div class="lightbox-inner">
+      <div class="lightbox-head">
+        <h3 id="lightboxTitle">Incident</h3>
+        <button id="lightboxClose" class="icon-btn" type="button" aria-label="Close player">
+          <svg><use href="#i-close" /></svg>
+        </button>
+      </div>
+      <video id="lightboxVideo" controls playsinline preload="metadata"></video>
+      <div class="lightbox-foot">
+        <span id="lightboxMeta"></span>
+        <span class="spacer"></span>
+        <button id="lightboxPrev" class="link-btn" type="button">← Previous</button>
+        <button id="lightboxNext" class="link-btn" type="button">Next →</button>
+        <a id="lightboxDownload" class="link-btn" href="#" download>Download</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='zones.js') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

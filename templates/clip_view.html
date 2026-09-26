@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark light" />
+  <title>{{ filename }} · Incident clip</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <style>
+    .viewer {
+      width: min(1040px, calc(100% - 32px));
+      margin: 28px auto;
+    }
+    .viewer video {
+      display: block;
+      width: 100%;
+      max-height: 72vh;
+      background: #05080c;
+      border-radius: var(--r-md);
+      border: 1px solid var(--border);
+    }
+    .viewer .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-bar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" width="17" height="17">
+          <path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6z" />
+          <circle cx="12" cy="11" r="2.4" />
+        </svg>
+      </span>
+      <span>
+        Incident clip
+        <small>{{ filename }}</small>
+      </span>
+    </div>
+    <div class="bar-spacer"></div>
+    <a class="btn btn-ghost btn-sm" href="/">Back to the dashboard</a>
+  </header>
+
+  <main class="viewer panel">
+    <div class="panel-body">
+      {% if not_found %}
+        <div class="empty-state">
+          <span>That clip is no longer available.</span>
+          <span class="hint">It may have been deleted from the incidents list.</span>
+        </div>
+      {% else %}
+        <video controls autoplay preload="metadata" playsinline>
+          <source src="{{ media_url }}" type="{{ content_type }}" />
+          Your browser cannot play this clip.
+        </video>
+
+        <div class="row">
+          <a class="btn btn-primary" href="{{ media_url }}" download>Download clip</a>
+          <a class="btn btn-ghost" href="{{ media_url }}" target="_blank" rel="noreferrer">Open raw file</a>
+        </div>
+
+        <p class="hint">
+          Clips are written with a browser-playable codec that is verified before
+          recording starts. If playback still fails, download the file and open it
+          in VLC, and check the server log for the codec that was selected.
+        </p>
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>

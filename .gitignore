@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Test & tooling caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Runtime output: clips, thumbnails, uploads and the incident database
+outputs/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Downloaded model weights (fetched automatically on first use)
+models/
